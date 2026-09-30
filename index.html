@@ -1,1 +1,96 @@
+<!doctype html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sistemas de ecuaciones · con el prof. Anto</title>
+  <meta name="description" content="Aprende a resolver sistemas de ecuaciones 2×2 paso a paso: sustitución, igualación, eliminación y Cramer.">
+  <meta name="theme-color" content="#F5EFE6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17130F" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
+  <script>
+    // Tema antes de pintar (evita parpadeo)
+    try { var t = (JSON.parse(localStorage.getItem('sde.v1') || '{}').theme) || 'system';
+      document.documentElement.dataset.theme = t === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t; } catch (e) {}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500&display=swap">
+  <link rel="preconnect" href="https://images.unsplash.com">
+  <link rel="stylesheet" href="vendor/katex/katex.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <script defer src="vendor/katex/katex.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body data-grow="0">
+  <a class="sr skip" href="#main">Saltar al contenido</a>
+  <div class="photo" id="photo" aria-hidden="true"></div>
+  <div class="backdrop is-hidden" id="backdrop" aria-hidden="true"><div class="veil"></div></div>
 
+  <header class="top" id="top">
+    <div class="top-l">
+      <button class="brand" id="brand" type="button" aria-label="Sistemas de ecuaciones con el prof. Anto. Ir al inicio">
+        <span class="mark" aria-hidden="true">{ }</span>
+        <b>Sistemas de ecuaciones</b> <span class="by">con el prof. Anto</span>
+      </button>
+      <button class="back is-hidden" id="back" type="button">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M12 7H2M6 3 2 7l4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Cafetería
+      </button>
+      <span class="wtitle is-hidden" id="wtitle"></span>
+    </div>
+    <nav class="pizarra is-hidden" id="pizarra" aria-label="Nivel"></nav>
+    <div class="hud" id="hud">
+      <button class="chip" id="chipXP" type="button" aria-label="Experiencia. Abrir tu libreta de progreso"><i class="bean" aria-hidden="true"></i><span id="xp">0</span> <small>XP</small></button>
+      <span class="chip opt-hide" id="chipStreak" title="Ejercicios seguidos con a lo sumo un error"><i class="leaf" aria-hidden="true"></i><span id="streak">0</span> <small>seguidos</small></span>
+      <span class="chip opt-hide" id="chipGoal" title="Meta de hoy: 5 ejercicios">
+        <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="6.5" fill="none" stroke="var(--borde)" stroke-width="2.4"/><circle id="ring" cx="9" cy="9" r="6.5" fill="none" stroke="var(--hoja)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="40.84" stroke-dashoffset="40.84" transform="rotate(-90 9 9)"/></svg>
+        <span id="goal">0/5</span><span class="sr"> ejercicios de la meta de hoy</span>
+      </span>
+      <button class="chip" id="chipTheme" type="button"><i class="tdot" aria-hidden="true"></i><small id="themeLbl">Sistema</small></button>
+      <button class="chip opt-hide" id="chipSound" type="button" aria-pressed="false"><span aria-hidden="true">♪</span><small id="soundLbl">Silencio</small></button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="view is-on" id="home" aria-labelledby="h1">
+      <div class="hero">
+        <h1 id="h1">Sistemas de ecuaciones</h1>
+        <p>Elige cómo quieres resolverlo.</p>
+      </div>
+      <div class="cafe" id="cafe">
+        <div class="scene-glow"></div>
+        <div class="cafe-top"><span class="sign">CAFÉ · ÁLGEBRA · desde 2026</span></div>
+        <div class="rincones" id="rincones"></div>
+      </div>
+      <div class="continue" id="continue"></div>
+    </section>
+    <section class="view" id="work"></section>
+  </main>
+
+  <dialog class="libreta" id="libreta" aria-labelledby="libTitle">
+    <div class="lib">
+      <div class="lib-head">
+        <h2 id="libTitle">Tu libreta</h2>
+        <button class="btn sec" type="button" id="libClose">Cerrar</button>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="ptable" id="ptable"></div>
+      <div class="lib-set">
+        <span class="cap">Ajustes</span>
+        <div class="btns left">
+          <button class="btn sec" type="button" id="setTheme"></button>
+          <button class="btn sec" type="button" id="setSound"></button>
+          <button class="btn sec" type="button" id="reset">Borrar progreso</button>
+        </div>
+      </div>
+      <p class="credits">Fotos desenfocadas de <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a>: Zhaoli JIN, Maxim Tolchinskiy, Jason Leung, Phước Sang y Fairuz Naufal Zaki. Matemáticas con KaTeX. Tu progreso se guarda solo en este navegador.</p>
+    </div>
+  </dialog>
+
+  <div class="particles" id="particles" aria-hidden="true"></div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="sr" id="live" aria-live="polite"></div>
+  <noscript><p style="padding:24px">Esta página necesita JavaScript.</p></noscript>
+</body>
+</html>
