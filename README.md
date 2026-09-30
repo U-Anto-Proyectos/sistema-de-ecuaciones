@@ -36,7 +36,7 @@ tests/gen.test.mjs  verificación masiva del generador
 ## Probar
 
 ```bash
-npm test                       # verifica miles de ejercicios por método y nivel
+npm test                       # verifica miles de ejercicios y que lo mostrado coincida con lo calculado
 python3 -m http.server 8000    # y abrir http://localhost:8000
 ```
 

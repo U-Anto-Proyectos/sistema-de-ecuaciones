@@ -190,7 +190,7 @@ function newExercise() {
         <h2 class="deskprompt" id="prompt" tabindex="-1"></h2>
         <div class="dstage"></div>
         <div class="lines"></div>
-        <div class="panel"><div class="opts" role="group" aria-labelledby="prompt"></div><div class="fbs" aria-live="polite"></div></div>
+        <div class="panel"><div class="kind" id="kind"></div><div class="opts" role="group" aria-labelledby="prompt" aria-describedby="kind"></div><div class="fbs" aria-live="polite"></div></div>
       </section></div></div>`;
   } else {
     W.innerHTML = `<div class="work enter"><div class="grid">
@@ -200,9 +200,10 @@ function newExercise() {
         <div class="lines"></div>
       </article>
       <section class="panel" aria-label="Siguiente paso">
-        <span class="cap">Siguiente paso</span>
+        <span class="cap" id="pcap">Siguiente paso</span>
         <h2 class="prompt" id="prompt" tabindex="-1"></h2>
-        <div class="opts" role="group" aria-labelledby="prompt"></div>
+        <div class="kind" id="kind"></div>
+        <div class="opts" role="group" aria-labelledby="prompt" aria-describedby="kind"></div>
         <div class="fbs" aria-live="polite"></div>
         <div class="foot"><button type="button" class="hintbtn">Pista</button></div>
         <div class="hintbox"></div>
@@ -210,7 +211,7 @@ function newExercise() {
   }
   const root = W.firstElementChild;
   run.R = {
-    root, prompt: $('#prompt', root), opts: $('.opts', root), fbs: $('.fbs', root), hintbtn: $('.hintbtn', root), hintbox: $('.hintbox', root),
+    root, prompt: $('#prompt', root), kind: $('#kind', root), pcap: $('#pcap', root), opts: $('.opts', root), fbs: $('.fbs', root), hintbtn: $('.hintbtn', root), hintbox: $('.hintbox', root),
     lines: $('.lines', root), eqs: $('.eqs', root), hoja: $('.hoja', root), dots: $('.dots', root), panel: $('.panel', root),
     roles: $('.roles', root), route: $('.route', root), dstage: $('.dstage', root), desk: $('.desk', root),
   };
@@ -243,15 +244,15 @@ function dots() {
   run.R.dots.innerHTML = Array.from({ length: total }, (_, i) => `<i class="${i <= run.done ? 'on' : ''}"></i>`).join('');
 }
 
-const ROUTE = ['Separar coeficientes', 'Calcular D', 'Construir Dₓ', 'Construir Dᵧ', 'x = Dₓ / D,  y = Dᵧ / D'];
+const ROUTE = ['Separar coeficientes', 'Construir Dₓ', 'Construir Dᵧ', 'Calcular D', 'x = Dₓ / D,  y = Dᵧ / D'];
 const ROUTE0 = ['Filas y columnas', 'Armar la matriz', 'Determinante'];
 function renderRoute(step) {
   let items = ROUTE, idx;
   if (cur.level === 'desde0') { items = ROUTE0; idx = step.kind === 'grid' ? 0 : step.kind === 'build' ? 1 : 2; }
   else if (step.kind === 'build') idx = 0;
-  else if (step.kind === 'det') idx = { D: 1, D_x: 2, D_y: 3 }[step.label] ?? 1;
-  else if (step.kind === 'swap') idx = step.target === 'x' ? 2 : 3;
-  else if (step.fx && step.fx.type === 'd0') { items = [ROUTE[0], ROUTE[1], 'Conclusión (D = 0)']; idx = 2; }
+  else if (step.kind === 'det') idx = { D_x: 1, D_y: 2, D: 3 }[step.label] ?? 3;
+  else if (step.kind === 'swap') idx = step.target === 'x' ? 1 : 2;
+  else if (step.fx && step.fx.type === 'd0') { items = [...ROUTE.slice(0, 4), 'Conclusión (D = 0)']; idx = 4; }
   else idx = 4;
   run.R.route.innerHTML = items.map((t, i) => `<div class="${i < idx ? 'ok' : i === idx ? 'now' : ''}"${i === idx ? ' aria-current="step"' : ''}><b aria-hidden="true">${i < idx ? '✓' : i + 1}</b>${t}</div>`).join('');
 }
@@ -259,7 +260,7 @@ function renderRoute(step) {
 // ---------- ciclo de pasos ----------
 function nextStep() {
   const R = run.R;
-  R.opts.innerHTML = ''; R.opts.className = 'opts'; clearSay(); R.hintbox.innerHTML = '';
+  R.opts.innerHTML = ''; R.opts.className = 'opts'; clearSay(); R.hintbox.innerHTML = ''; setKind('');
   run.hint = 0; run.busy = false; R.hintbtn.disabled = false; R.hintbtn.textContent = 'Pista';
   $$('.eqrow.focus', R.root).forEach((e) => e.classList.remove('focus'));
   if (!run.queue.length) { if (run.ex.second && !run.inSecond) return startSecond(); return finish(); }
@@ -270,8 +271,24 @@ function nextStep() {
   if (mobile() && run.done > 0) (run.cramer && step.kind === 'build' ? R.roles : R.prompt).scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
 }
 
+// Dos tipos de pregunta, siempre distinguibles:
+//  'one'  → solo una opción es correcta (las demás son errores reales)
+//  'free' → decisión del estudiante: todas las opciones son válidas
+const KIND = {
+  one: '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="3" fill="currentColor"/></svg>Solo una es correcta',
+  free: '<svg width="18" height="16" viewBox="0 0 18 16" aria-hidden="true"><path d="M2 14V9c0-2 1-3 3-3h9M11 3l3 3-3 3M2 9c0-2 1-3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="2" cy="14" r="1.6" fill="currentColor"/></svg>Tú eliges el camino: todas las opciones son válidas',
+};
+function setKind(k) {
+  const R = run.R;
+  if (!R.kind) return;
+  R.kind.className = 'kind' + (k ? ' ' + k : '');
+  R.kind.innerHTML = KIND[k] || '';
+  if (R.pcap) R.pcap.textContent = k === 'free' ? 'Tu decisión' : 'Siguiente paso';
+  R.root.classList.toggle('is-free', k === 'free');
+}
 function options(step, { gate = false, row = false, label } = {}) {
   const R = run.R;
+  setKind('one');
   R.opts.className = 'opts' + (row ? ' row' : '');
   R.opts.innerHTML = step.options.map((o, i) => `<button type="button" class="opt${gate ? ' locked' : ''}" data-i="${i}" style="animation-delay:${i * 45}ms"${gate ? ' disabled' : ''}><span class="kbd" aria-hidden="true">${i + 1}</span><span class="math">${K(label ? label(o) : o.line.tex)}</span><span class="mk" aria-hidden="true"></span></button>`).join('');
   $$('.opt', R.opts).forEach((b) => (b.onclick = () => pick(step, +b.dataset.i, b)));
@@ -302,7 +319,7 @@ function onCorrect(step) {
     const qb = $('.qbox', run.R.dstage); if (qb) { qb.innerHTML = K(texNum(step.value)); qb.classList.add('filled'); }
   }
   if (t === 'side') fillPill(step.fx.side, step.line.tex);
-  if (t === 'factors') setK(step.line.k);
+  if (t === 'factors') setK(step.line.k, step.fx);
   if (t === 'rows') setRows(step.line.eqs);
   if (t === 'd0') showD0(step.fx.singular);
   if (step.kind !== 'det') writeLine(step.line, isLast() ? 'final' : '');
@@ -368,24 +385,26 @@ function fly(from, to, html, done) {
 // ---------- pasos: decisión ----------
 function stDecide(step) {
   setPrompt(step.prompt);
+  setKind('free');
   const R = run.R;
   const lab = (c) => (c.eq != null ? `Despejar ${K(c.v)} de (${c.eq + 1})` : c.w ? `Eliminar ${K(c.w)}` : `Igualar ${K(c.v)}`);
-  R.opts.innerHTML = step.choices.map((c, i) => `<button type="button" class="opt choice" data-i="${i}" style="animation-delay:${i * 45}ms"><span class="kbd" aria-hidden="true">${i + 1}</span><span class="math">${lab(c)}</span><span class="mk" aria-hidden="true"></span></button>`).join('');
+  const GO = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  R.opts.innerHTML = step.choices.map((c, i) => `<button type="button" class="opt choice" data-i="${i}" style="animation-delay:${i * 45}ms"><span class="kbd" aria-hidden="true">${i + 1}</span><span class="math">${lab(c)}</span><span class="go" aria-hidden="true">${GO}</span></button>`).join('');
   $$('.opt', R.opts).forEach((b) => (b.onclick = () => {
     if (run.busy) return;
     run.busy = true;
     const c = step.choices[+b.dataset.i];
-    b.classList.add('ok'); b.querySelector('.mk').textContent = '✓';
-    $$('.opt', R.opts).forEach((x) => { if (x !== b) { x.disabled = true; x.classList.add('dim'); } });
-    SND.ok();
-    if (c.note) say(c.note, 'note');
+    b.classList.add('chosen'); b.setAttribute('aria-pressed', 'true');
+    $$('.opt', R.opts).forEach((x) => { if (x !== b) { x.disabled = true; x.classList.add('dim'); $('.math', x).insertAdjacentHTML('beforeend', '<small class="alt">También era válida</small>'); } });
+    SND.tap();
+    say(c.note ? `Camino elegido. ${c.note}` : 'Camino elegido. Cualquiera de las opciones servía.', 'note');
     writeTag(c.eq != null ? `Despejo $${c.v}$ de (${c.eq + 1})` : c.w ? `Elimino $${c.w}$` : `Igualo $${c.v}$ en las dos ecuaciones`);
     run.queue.unshift(...c.steps);
     run.choice = c;
     if (cur.method === 'igualacion') stageTwin(c.v);
     if (cur.method === 'eliminacion') stageRows(c.w);
     run.done++;
-    later(nextStep, c.note ? 1300 : 600);
+    later(nextStep, c.note ? 1600 : 1100);
   }));
 }
 
@@ -487,11 +506,13 @@ function stageRows() {
   stageIn(el(`<div class="stage"><div class="rows">
     <div class="row" data-r="0"><span class="k">×?</span>${rowCells(s.a, s.b, s.e)}</div>
     <div class="row" data-r="1"><span class="k">×?</span>${rowCells(s.c, s.d, s.f)}</div>
-  </div><span class="cap2 note">Busca multiplicadores que dejen opuestos los términos resaltados.</span></div>`));
+  </div><span class="cap2 note">Cruza los coeficientes resaltados: cada fila se multiplica por el de la otra, tal como está.</span></div>`));
 }
-function setK(k) {
+function setK(k, fx = {}) {
   if (!run.stage) return;
   $$('.row .k', run.stage).forEach((e, i) => { e.textContent = '×' + (k[i].sign < 0 ? `(${pl(k[i])})` : pl(k[i])); e.classList.add('on'); });
+  const n = $('.note', run.stage);
+  if (n) n.textContent = k[0].eq(1) && k[1].eq(1) ? 'Ya son opuestos: se suman directamente.' : fx.sign ? 'Con un signo cambiado, los términos resaltados quedarán opuestos.' : 'Con el cruce, los términos resaltados quedarán iguales: falta cambiar un signo.';
 }
 function setRows(eqs) {
   if (!run.stage) return;
@@ -597,7 +618,7 @@ function stDet(step) {
       if (!alto) $('.prods', R.dstage).append(el('<small>Los productos viajan a la expresión final ↓</small>'));
       const ex = $('.detexpr', R.dstage); ex.classList.remove('is-hidden');
       ex.innerHTML = K(alto ? `${step.label} = ${texNum(a)}\\cdot ${P(d)} - ${texNum(b)}\\cdot ${P(c)} =` : `${step.label} = \\left(${texNum(ad)}\\right) - \\left(${texNum(bc)}\\right) =`) + '<span class="qbox" aria-label="valor por calcular">?</span>';
-      setPrompt(`¿Cuánto vale ${LBL[step.label]}?`); unlock();
+      setPrompt(step.label === 'D' ? '¿Cuánto vale D, el determinante del sistema?' : `¿Cuánto vale ${LBL[step.label]}?`); unlock();
     }
   };
   $('.dbtn.d1', R.dstage).onclick = () => show(1);
@@ -654,9 +675,9 @@ function stSwap(step) {
 
 function deskResults(step) {
   const R = run.R, t = step.fx && step.fx.type;
-  const res = (lb, v, c, sub) => (v ? `<div class="res" style="--rc:${c}">${K(lb + ' = ' + texNum(v))}<small>${sub}</small></div>` : '');
-  R.dstage.innerHTML = `<div class="results">${res('D', run.dets.D, 'var(--m4)', 'determinante')}${t === 'd0' ? '' : res('D_x', run.dets.D_x, 'var(--rx)', 'B en la columna de x') + res('D_y', run.dets.D_y, 'var(--ry)', 'B en la columna de y')}</div>`;
-  if (t === 'd0' && run.dets.D && run.dets.D.isZero) R.dstage.firstElementChild.innerHTML = `<div class="res" style="--rc:var(--m4)">${K('D = 0')}<small>determinante</small></div>`;
+  const res = (lb, v, c, sub) => (v !== undefined ? `<div class="res" style="--rc:${c}">${K(lb + ' = ' + texNum(v))}<small>${sub}</small></div>` : '');
+  // mismo orden que la fórmula: Dₓ, Dᵧ y al final D (el denominador)
+  R.dstage.innerHTML = `<div class="results">${res('D_x', run.dets.D_x, 'var(--rx)', 'B en la columna de x')}${res('D_y', run.dets.D_y, 'var(--ry)', 'B en la columna de y')}${res('D', run.dets.D, 'var(--m4)', 'determinante del sistema')}</div>`;
 }
 function showD0(singular) {
   const par = singular !== 'dependiente';

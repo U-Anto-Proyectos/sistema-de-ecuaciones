@@ -2,5 +2,5 @@
   "name": "sistemas-de-ecuaciones",
   "private": true,
   "type": "module",
-  "scripts": { "test": "node tests/gen.test.mjs 3000" }
+  "scripts": { "test": "node tests/gen.test.mjs 3000 && node tests/render.test.mjs 600" }
 }

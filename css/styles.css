@@ -494,3 +494,22 @@ button.xpill:hover { box-shadow: 0 0 0 2px var(--m2); }
   .desk { padding: 18px 12px 20px; }
   .deskprompt { font-size: 14px; }
 }
+
+/* ---------- tipo de pregunta: una correcta vs. decisión libre ---------- */
+.kind { justify-self: start; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px 6px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; line-height: 1.2; animation: spring .26s cubic-bezier(.3, 1.4, .5, 1); }
+.kind:empty { display: none; }
+.kind svg { flex: none; }
+.kind.one { background: var(--crema2); color: var(--tinta2); }
+.kind.free { background: color-mix(in srgb, var(--m) 16%, var(--papel)); color: var(--tinta); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--m) 45%, transparent); }
+.kind.free svg { color: var(--m); }
+.desk .kind { justify-self: center; margin-bottom: 4px; }
+.is-free .cap { color: color-mix(in srgb, var(--m) 70%, var(--tinta)); }
+/* opciones de decisión: sin círculo de respuesta, borde punteado, flecha de camino */
+.opt.choice { border: 1.5px dashed color-mix(in srgb, var(--m) 60%, var(--borde)); background: color-mix(in srgb, var(--m) 5%, var(--papel)); box-shadow: none; }
+@media (hover: hover) { .opt.choice:not(:disabled):hover { border-style: solid; border-color: var(--m); box-shadow: 0 10px 24px rgba(46, 30, 15, .1); } }
+.opt.choice .go { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--m) 16%, transparent); color: var(--m); transition: transform .2s var(--ease); }
+.opt.choice:not(:disabled):hover .go { transform: translateX(3px); }
+.opt.choice.chosen { border: 2px solid var(--m); background: color-mix(in srgb, var(--m) 13%, var(--papel)); color: var(--tinta); }
+.opt.choice.chosen .go { background: var(--m); color: var(--papel); }
+.opt.choice.dim { opacity: .55; }
+.opt.choice .alt { display: block; font-size: 12px; font-weight: 500; color: var(--tinta2); margin-top: 3px; }

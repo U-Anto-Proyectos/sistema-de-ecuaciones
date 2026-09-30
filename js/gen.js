@@ -241,7 +241,7 @@ export function makeSystem(R, level, method, opts = {}) {
 // Sistema con D = 0 (Cramer Alto): incompatible o compatible indeterminado
 function makeSingular(R) {
   const a = R.nz(-5, 5), b = R.nz(-5, 5), k = R.pick([2, 3, -2]);
-  const e = R.int(-12, 12);
+  const e = R.nz(-12, 12); // e ≠ 0: si no, Dₓ y Dᵧ tendrían una columna de ceros
   const dependent = R.chance(0.4);
   const f = dependent ? e * k : e * k + R.nz(-4, 4);
   return { a: q(a), b: q(b), e: q(e), c: q(a * k), d: q(b * k), f: q(f), singular: dependent ? 'dependiente' : 'incompatible' };
@@ -321,14 +321,16 @@ function backSub(R, v, expr, u, uval, sol) {
   return makeStep(R, mk(target), cands, { prompt: `Halla ${v}`, hints: [`Sustituye ${u} en el despeje de ${v}.`, `Mira el despeje de ${v}.`, `Reemplaza ${u} por ${plain(uval)} y calcula.`, `Empieza así: $${v} = ${shown}$`], sol, fx: 'backsub', focus: 'last' });
 }
 function texSubst(node, u, val) {
-  const wrap = (x) => (x.sign < 0 || !x.isInt ? `\\left(${texNum(x)}\\right)` : texNum(x));
+  // entero: paréntesis normales (sin espacio extra); fracción: paréntesis que se estiran
+  const par = (x) => (x.isInt ? `(${texNum(x)})` : `\\left(${texNum(x)}\\right)`);
+  const wrap = (x) => (x.sign < 0 || !x.isInt ? par(x) : texNum(x));
   const walk = (e) => {
     switch (e.k) {
       case 'n': return texNum(e.v);
       case 'v': return e.n === u ? wrap(val) : e.n;
       case 'lin': return walk(linNode(e));
       case 'sum': { let s = walk(e.t[0]); for (const t of e.t.slice(1)) { const neg = (t.k === 'n' && t.v.sign < 0) || (t.k === 'mul' && t.c.sign < 0); const tt = neg ? (t.k === 'n' ? N(t.v.abs()) : mul(t.c.abs(), t.e)) : t; s += (neg ? ' - ' : ' + ') + walk(tt); } return s; }
-      case 'mul': { const inner = e.e.k === 'lin' ? linNode(e.e) : e.e; if (inner.k === 'v' && inner.n === u) return (e.c.eq(1) ? '' : e.c.eq(-1) ? '-' : texNum(e.c)) + wrap(val); return tex(e); }
+      case 'mul': { const inner = e.e.k === 'lin' ? linNode(e.e) : e.e; if (inner.k === 'v' && inner.n === u) return e.c.eq(1) ? wrap(val) : (e.c.eq(-1) ? '-' : texNum(e.c)) + par(val); return tex(e); }
       case 'div': return `\\dfrac{${walk(e.e)}}{${texNum(e.d)}}`;
     }
     return tex(e);
@@ -421,27 +423,47 @@ function methodEliminacion(R, s, level) {
   for (const w of ['x', 'y']) {
     const p = coefOf(s, 0, w), r = coefOf(s, 1, w);
     if (p.isZero || r.isZero) continue;
-    const l = lcm(p.n, r.n);
-    let k1 = q(l / Math.abs(p.n)), k2 = q(l / Math.abs(r.n));
-    if (p.sign === r.sign) k2 = k2.neg();
-    if (p.add(r).isZero) { k1 = q(1); k2 = q(1); }
+    // Método del cruce: (1) se multiplica por el coeficiente de w de (2) y (2) por el de (1),
+    // tal como están (sin simplificar). Luego se cambia el signo de un factor para que queden opuestos.
+    const already = p.add(r).isZero;
+    const k1 = already ? q(1) : r, k2 = already ? q(1) : p.neg();
     const scaleEq = (i, k) => stdEq(coefOf(s, i, 'x').mul(k), coefOf(s, i, 'y').mul(k), rhsOf(s, i).mul(k));
     const E1 = scaleEq(0, k1), E2 = scaleEq(1, k2);
     const fmtK = (k) => (k.sign < 0 ? `(${texNum(k)})` : texNum(k));
     const steps = [];
-    // factores
-    const fline = (a, b, id) => ({ kind: 'text', tex: `(1)\\times ${fmtK(a)},\\quad (2)\\times ${fmtK(b)}`, key: `K:${a.key()},${b.key()}`, k: [a, b] });
-    const already = k1.eq(1) && k2.eq(1);
-    const corF = already ? { kind: 'text', tex: '\\text{Ya son opuestos: sumar directamente}', key: 'K:1,1', k: [q(1), q(1)] } : fline(k1, k2);
-    const fc = [];
+    const fline = (a, b) => ({ kind: 'text', tex: `(1)\\times ${fmtK(a)},\\quad (2)\\times ${fmtK(b)}`, key: `K:${a.key()},${b.key()}`, k: [a, b] });
+    const ALREADY = { kind: 'text', tex: '\\text{Ya son opuestos: sumar directamente}', key: 'K:1,1', k: [q(1), q(1)] };
+    const u0 = other(w), pu = coefOf(s, 0, u0), ru = coefOf(s, 1, u0);
+    // ¿esa pareja de factores también dejaría coeficientes de igual valor absoluto? entonces no es un error
+    const alsoWorks = (c) => c.line.k && p.mul(c.line.k[0]).abs().eq(r.mul(c.line.k[1]).abs());
     if (!already) {
-      fc.push({ line: fline(k1, k2.neg()), fb: 'Así no se anulan: necesitas signos opuestos.' });
-      if (!k1.eq(k2.abs())) fc.push({ line: fline(k2.abs(), k1.mul(k2.sign)), fb: `Así los coeficientes de ${w} no quedan iguales.` });
-      fc.push({ line: { kind: 'text', tex: '\\text{Ya son opuestos: sumar directamente}', key: 'K:1,1' }, fb: `Aún no: ${plain(p)}${w} y ${plain(r)}${w} no son opuestos.` });
+      const oneEach = 'Cada ecuación se multiplica por el coeficiente de la otra.';
+      const cross = [
+        { line: fline(p, r), fb: `Se cruzan: (1) va por el coeficiente de ${w} de (2), y (2) por el de (1).` },
+        { line: fline(r, r), fb: oneEach },
+        { line: fline(p, p), fb: oneEach },
+        { line: fline(ru, pu), fb: `Para eliminar ${w} se cruzan los coeficientes de ${w}, no los de ${u0}.` },
+        { line: fline(q(1), p), fb: 'Multiplica las dos ecuaciones, cada una por el coeficiente de la otra.' },
+        { line: fline(r, q(1)), fb: 'Multiplica las dos ecuaciones, cada una por el coeficiente de la otra.' },
+        { line: fline(r, p.add(p.sign)), fb: `Usa los coeficientes de ${w} tal como están: (2) va por ${plain(p)}.` },
+        { line: fline(r.add(r.sign), p), fb: `Usa los coeficientes de ${w} tal como están: (1) va por ${plain(r)}.` },
+        { line: { ...ALREADY, k: undefined }, fb: `Aún no: $${texNum(p)}${w}$ y $${texNum(r)}${w}$ no son opuestos.` },
+      ].filter((c) => !alsoWorks(c));
+      steps.push(makeStep(R, fline(r, p), cross, { prompt: `Cruza los coeficientes de ${w}: ¿por cuánto multiplicas cada ecuación?`, fx: { type: 'factors', w }, hints: [`Cruce: cada ecuación se multiplica por el coeficiente de ${w} de la otra ecuación.`, `Mira $${texNum(p)}${w}$ en (1) y $${texNum(r)}${w}$ en (2).`, `(1) va por ${plain(r)} y (2) va por ${plain(p)}, tal como están, con su signo.`, `Empieza así: $(1)\\times ${fmtK(r)},\\ \\ldots$`] }));
+      const prod = p.mul(r);
+      const sign = [
+        { line: fline(r, p), fb: `Así quedan $${texNum(prod)}${w}$ y $${texNum(prod)}${w}$: iguales, y al sumar no se anulan.` },
+        { line: fline(r.neg(), p.neg()), fb: `Si cambias los dos signos siguen iguales: $${texNum(prod.neg())}${w}$ y $${texNum(prod.neg())}${w}$.` },
+        { line: { kind: 'text', tex: `\\text{Cambio solo el signo del término en } ${w}`, key: 'K:solo' }, fb: 'El factor multiplica toda la ecuación: el signo se cambia en el factor.' },
+      ];
+      steps.push(makeStep(R, fline(r, p.neg()), sign, { prompt: `Con el cruce quedan $${texNum(prod)}${w}$ y $${texNum(prod)}${w}$, iguales. ¿Qué signo cambias para que sean opuestos?`, fx: { type: 'factors', w, sign: true }, hints: ['Para que se anulen, deben ser opuestos: mismo número y signo contrario.', 'Mira los dos factores del cruce.', 'Cambia el signo del factor de una sola ecuación, la (2).', `Resultado buscado: $${texNum(prod)}${w}$ y $${texNum(prod.neg())}${w}$`] }));
     } else {
-      fc.push({ line: fline(q(1), q(-1)), fb: 'Ya son opuestos: no hace falta multiplicar.' }, { line: fline(q(2), q(1)), fb: 'Ya son opuestos: no hace falta multiplicar.' });
+      steps.push(makeStep(R, ALREADY, [
+        { line: fline(r, p), fb: 'Ya son opuestos: no hace falta cruzar ni multiplicar.' },
+        { line: fline(q(1), q(-1)), fb: 'Ya son opuestos: si cambias un signo, quedarían iguales.' },
+        { line: fline(q(2), q(1)), fb: 'Ya son opuestos: no hace falta multiplicar.' },
+      ], { prompt: `¿Qué haces para eliminar ${w}?`, fx: { type: 'factors', w }, hints: [`Para eliminar ${w}, sus coeficientes deben ser opuestos.`, `Mira $${texNum(p)}${w}$ y $${texNum(r)}${w}$.`, '¿Tienen el mismo número y signo contrario?', 'Si ya son opuestos, se suman directamente.'] }));
     }
-    steps.push(makeStep(R, corF, fc, { prompt: `¿Por cuánto multiplicas para eliminar ${w}?`, fx: { type: 'factors', w }, hints: [`Para eliminar ${w}, sus coeficientes deben ser opuestos.`, `Mira ${plain(p)}${w} y ${plain(r)}${w}.`, 'Busca el mínimo común múltiplo de los coeficientes y usa signos contrarios.', `Resultado buscado: $${texNum(p.mul(k1))}${w}$ y $${texNum(r.mul(k2))}${w}$`] }));
     if (!already) {
       const cor = pairLine(E1, E2);
       const onlyL = (i, k) => stdEq(coefOf(s, i, 'x').mul(k), coefOf(s, i, 'y').mul(k), rhsOf(s, i));
@@ -523,8 +545,14 @@ function cramer(R, s, level) {
   const A = [s.a, s.b, s.c, s.d], B = [s.e, s.f];
   const steps = [];
   steps.push({ kind: 'build', prompt: 'Separa los coeficientes', A, B, hints: ['A guarda los coeficientes de x (columna 1) y de y (columna 2). B, los términos independientes.', 'Mira la casilla iluminada: fila y columna.', 'La fila es la ecuación; la columna es la incógnita.', 'Toca el número de esa ecuación que acompaña a esa incógnita.'] });
+  // Orden de la fórmula x = Dₓ / D, y = Dᵧ / D: primero Dₓ, luego Dᵧ y al final D (el que va abajo).
   const D = det(...A);
-  steps.push(detStep(R, 'D', A, 'Calcula D'));
+  const Dx = det(s.e, s.b, s.f, s.d), Dy = det(s.a, s.e, s.c, s.f);
+  steps.push({ kind: 'swap', target: 'x', prompt: 'Construye Dₓ', A, B, hints: ['Para Dₓ, los términos independientes reemplazan la columna de x.', 'Mira la columna 1 (la de x).', 'Toca la columna de x y luego B.', 'La columna 1 queda con los números de B.'] });
+  steps.push(detStep(R, 'D_x', [s.e, s.b, s.f, s.d], 'Calcula Dₓ'));
+  steps.push({ kind: 'swap', target: 'y', prompt: 'Construye Dᵧ', A, B, hints: ['Para Dᵧ, B reemplaza la columna de y.', 'Mira la columna 2 (la de y).', 'Toca la columna de y y luego B.', 'La columna 2 queda con los números de B.'] });
+  steps.push(detStep(R, 'D_y', [s.a, s.e, s.c, s.f], 'Calcula Dᵧ'));
+  steps.push(detStep(R, 'D', A, 'Calcula D, el determinante del sistema (va abajo en la fórmula)'));
   if (D.isZero) {
     steps.push(makeStep(R, textLine('d0', 'No hay solución única por Cramer'), [
       { line: { kind: 'eq', tex: 'x = \\dfrac{D_x}{0}', key: 'T:div0' }, fb: 'No se puede dividir entre 0.' },
@@ -533,11 +561,6 @@ function cramer(R, s, level) {
     ], { prompt: '¿Qué concluyes?', fx: { type: 'd0', singular: s.singular }, hints: ['Cramer divide entre D.', 'Mira el valor de D.', 'Si D = 0, la división no existe.', 'La conclusión es sobre la unicidad de la solución.'] }));
     return steps;
   }
-  const Dx = det(s.e, s.b, s.f, s.d), Dy = det(s.a, s.e, s.c, s.f);
-  steps.push({ kind: 'swap', target: 'x', prompt: 'Construye Dₓ', A, B, hints: ['Para Dₓ, los términos independientes reemplazan la columna de x.', 'Mira la columna 1 (la de x).', 'Toca la columna de x y luego B.', 'La columna 1 queda con los números de B.'] });
-  steps.push(detStep(R, 'D_x', [s.e, s.b, s.f, s.d], 'Calcula Dₓ'));
-  steps.push({ kind: 'swap', target: 'y', prompt: 'Construye Dᵧ', A, B, hints: ['Para Dᵧ, B reemplaza la columna de y.', 'Mira la columna 2 (la de y).', 'Toca la columna de y y luego B.', 'La columna 2 queda con los números de B.'] });
-  steps.push(detStep(R, 'D_y', [s.a, s.e, s.c, s.f], 'Calcula Dᵧ'));
   const x = Dx.div(D), y = Dy.div(D);
   for (const [v, Dv, val] of [['x', 'D_x', x], ['y', 'D_y', y]]) {
     const frac = (n, d) => ({ kind: 'eq', tex: `${v} = \\dfrac{${n}}{${d}}`, key: `F:${n}/${d}` });
