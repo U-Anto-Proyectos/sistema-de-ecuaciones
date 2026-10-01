@@ -431,37 +431,52 @@ function methodEliminacion(R, s, level) {
     const E1 = scaleEq(0, k1), E2 = scaleEq(1, k2);
     const fmtK = (k) => (k.sign < 0 ? `(${texNum(k)})` : texNum(k));
     const steps = [];
-    const fline = (a, b) => ({ kind: 'text', tex: `(1)\\times ${fmtK(a)},\\quad (2)\\times ${fmtK(b)}`, key: `K:${a.key()},${b.key()}`, k: [a, b] });
     const ALREADY = { kind: 'text', tex: '\\text{Ya son opuestos: sumar directamente}', key: 'K:1,1', k: [q(1), q(1)] };
     const u0 = other(w), pu = coefOf(s, 0, u0), ru = coefOf(s, 1, u0);
-    // ¿esa pareja de factores también dejaría coeficientes de igual valor absoluto? entonces no es un error
-    const alsoWorks = (c) => c.line.k && p.mul(c.line.k[0]).abs().eq(r.mul(c.line.k[1]).abs());
+    // Las opciones muestran SOLO coeficientes (sin nombres de ecuación), en el orden de arriba hacia abajo.
+    const pairTex = (a, b) => `{${texNum(a)}} \\;\\;\\text{y}\\;\\; {${texNum(b)}}`; // llaves: el signo menos queda pegado al número
+    const pairLn = (a, b, k, write) => ({ kind: 'text', tex: pairTex(a, b), key: `C:${a.key()},${b.key()}`, k, write });
+    const sameNums = (a, b, c, d) => (a.eq(c) && b.eq(d)) || (a.eq(d) && b.eq(c));
+    const e1 = rhsOf(s, 0), e2 = rhsOf(s, 1);
     if (!already) {
-      const oneEach = 'Cada ecuación se multiplica por el coeficiente de la otra.';
-      const cross = [
-        { line: fline(p, r), fb: `Se cruzan: (1) va por el coeficiente de ${w} de (2), y (2) por el de (1).` },
-        { line: fline(r, r), fb: oneEach },
-        { line: fline(p, p), fb: oneEach },
-        { line: fline(ru, pu), fb: `Para eliminar ${w} se cruzan los coeficientes de ${w}, no los de ${u0}.` },
-        { line: fline(q(1), p), fb: 'Multiplica las dos ecuaciones, cada una por el coeficiente de la otra.' },
-        { line: fline(r, q(1)), fb: 'Multiplica las dos ecuaciones, cada una por el coeficiente de la otra.' },
-        { line: fline(r, p.add(p.sign)), fb: `Usa los coeficientes de ${w} tal como están: (2) va por ${plain(p)}.` },
-        { line: fline(r.add(r.sign), p), fb: `Usa los coeficientes de ${w} tal como están: (1) va por ${plain(r)}.` },
-        { line: { ...ALREADY, k: undefined }, fb: `Aún no: $${texNum(p)}${w}$ y $${texNum(r)}${w}$ no son opuestos.` },
-      ].filter((c) => !alsoWorks(c));
-      steps.push(makeStep(R, fline(r, p), cross, { prompt: `Cruza los coeficientes de ${w}: ¿por cuánto multiplicas cada ecuación?`, fx: { type: 'factors', w }, hints: [`Cruce: cada ecuación se multiplica por el coeficiente de ${w} de la otra ecuación.`, `Mira $${texNum(p)}${w}$ en (1) y $${texNum(r)}${w}$ en (2).`, `(1) va por ${plain(r)} y (2) va por ${plain(p)}, tal como están, con su signo.`, `Empieza así: $(1)\\times ${fmtK(r)},\\ \\ldots$`] }));
+      // 1) ¿qué coeficientes se cruzan? (solo una pareja, nunca la misma pareja al revés)
+      const cand = [
+        { a: pu, b: ru, fb: `Esos acompañan a ${u0}. Para eliminar ${w} se cruzan los coeficientes de ${w}.` },
+        { a: e1, b: e2, fb: `Esos son los términos independientes. Se cruzan los coeficientes de ${w}.` },
+        { a: p, b: ru, fb: `El segundo acompaña a ${u0}: los dos deben ser coeficientes de ${w}.` },
+        { a: pu, b: r, fb: `El primero acompaña a ${u0}: los dos deben ser coeficientes de ${w}.` },
+        { a: p, b: e2, fb: `El segundo es un término independiente: los dos deben ser coeficientes de ${w}.` },
+        { a: e1, b: r, fb: `El primero es un término independiente: los dos deben ser coeficientes de ${w}.` },
+        { a: pu, b: e2, fb: `Ninguno acompaña a ${w}. Se cruzan los coeficientes de ${w}.` },
+      ].filter((c) => !sameNums(c.a, c.b, p, r));
+      const seenPairs = [];
+      const cross = [];
+      const addAll = (list) => { for (const c of list) { if (sameNums(c.a, c.b, p, r) || seenPairs.some(([a, b]) => sameNums(a, b, c.a, c.b))) continue; seenPairs.push([c.a, c.b]); cross.push({ line: pairLn(c.a, c.b), fb: c.fb }); } };
+      addAll(cand);
+      // respaldo (solo si hacen falta opciones): tomar los dos números de una misma fila
+      if (cross.length < 2) addAll([
+        { a: p, b: p, fb: `Se toma un coeficiente de ${w} de cada fila: el de arriba y el de abajo.` },
+        { a: r, b: r, fb: `Se toma un coeficiente de ${w} de cada fila: el de arriba y el de abajo.` },
+        { a: p, b: pu, fb: `Esos dos son de la misma fila. Se toma el coeficiente de ${w} de arriba y el de abajo.` },
+        { a: ru, b: r, fb: `Esos dos son de la misma fila. Se toma el coeficiente de ${w} de arriba y el de abajo.` },
+        { a: e1, b: ru, fb: `Ninguno acompaña a ${w}. Se cruzan los coeficientes de ${w}.` },
+        { a: pu, b: pu, fb: `Ese número acompaña a ${u0}. Se cruzan los coeficientes de ${w}.` },
+      ]);
+      steps.push(makeStep(R, pairLn(p, r, [r, p], `\\text{Se cruzan } {${texNum(p)}} \\text{ y } {${texNum(r)}}`), cross, { prompt: `Para eliminar ${w}, ¿qué coeficientes se cruzan?`, fx: { type: 'factors', w }, hints: [`Se cruzan los coeficientes de la incógnita que quieres eliminar: ${w}.`, `Mira el número que acompaña a ${w} arriba y abajo.`, 'Cópialos tal como están, con su signo, de arriba hacia abajo. Si no se ve número, el coeficiente es 1 (o −1).', `Empieza así: $${texNum(p)} \\;\\text{y}\\; \\ldots$`] }));
+      // 2) signo: con el cruce tal cual, los dos términos quedan iguales; hay que cambiar un signo
       const prod = p.mul(r);
+      // misma pareja y mismo orden que en la pregunta anterior; solo cambia un signo
       const sign = [
-        { line: fline(r, p), fb: `Así quedan $${texNum(prod)}${w}$ y $${texNum(prod)}${w}$: iguales, y al sumar no se anulan.` },
-        { line: fline(r.neg(), p.neg()), fb: `Si cambias los dos signos siguen iguales: $${texNum(prod.neg())}${w}$ y $${texNum(prod.neg())}${w}$.` },
-        { line: { kind: 'text', tex: `\\text{Cambio solo el signo del término en } ${w}`, key: 'K:solo' }, fb: 'El factor multiplica toda la ecuación: el signo se cambia en el factor.' },
+        { line: pairLn(p, r), fb: `Sin cambiar signos quedan $${texNum(prod)}${w}$ y $${texNum(prod)}${w}$: iguales, y al sumar no se anulan.` },
+        { line: pairLn(p.neg(), r.neg()), fb: `Si cambias los dos signos siguen iguales: $${texNum(prod.neg())}${w}$ y $${texNum(prod.neg())}${w}$.` },
+        { line: { kind: 'text', tex: `\\text{Cambio solo el signo del término en } ${w}`, key: 'K:solo' }, fb: 'El signo se cambia al número del cruce, que multiplica toda la fila, no a un solo término.' },
       ];
-      steps.push(makeStep(R, fline(r, p.neg()), sign, { prompt: `Con el cruce quedan $${texNum(prod)}${w}$ y $${texNum(prod)}${w}$, iguales. ¿Qué signo cambias para que sean opuestos?`, fx: { type: 'factors', w, sign: true }, hints: ['Para que se anulen, deben ser opuestos: mismo número y signo contrario.', 'Mira los dos factores del cruce.', 'Cambia el signo del factor de una sola ecuación, la (2).', `Resultado buscado: $${texNum(prod)}${w}$ y $${texNum(prod.neg())}${w}$`] }));
+      steps.push(makeStep(R, pairLn(p.neg(), r, [r, p.neg()], `\\text{Con un signo cambiado: } {${texNum(p.neg())}} \\text{ y } {${texNum(r)}}`), sign, { prompt: `Con el cruce quedan $${texNum(prod)}${w}$ y $${texNum(prod)}${w}$, iguales. ¿Cómo quedan los números del cruce para que sean opuestos?`, fx: { type: 'factors', w, sign: true }, hints: ['Para que se anulen, deben ser opuestos: mismo número y signo contrario.', 'Mira los dos números del cruce.', 'Cambia el signo de uno solo de los dos: el primero.', `Resultado buscado: $${texNum(prod)}${w}$ y $${texNum(prod.neg())}${w}$`] }));
     } else {
       steps.push(makeStep(R, ALREADY, [
-        { line: fline(r, p), fb: 'Ya son opuestos: no hace falta cruzar ni multiplicar.' },
-        { line: fline(q(1), q(-1)), fb: 'Ya son opuestos: si cambias un signo, quedarían iguales.' },
-        { line: fline(q(2), q(1)), fb: 'Ya son opuestos: no hace falta multiplicar.' },
+        { line: { kind: 'text', tex: `\\text{Cruzar } ${texNum(p)} \\text{ y } ${texNum(r)}`, key: 'K:cruzar' }, fb: 'Ya son opuestos: no hace falta cruzar.' },
+        { line: { kind: 'text', tex: '\\text{Cambiar el signo de una fila}', key: 'K:signo' }, fb: 'Si cambias un signo, quedarían iguales y no se anularían.' },
+        { line: { kind: 'text', tex: '\\text{Multiplicar las dos filas por 2}', key: 'K:dos' }, fb: 'Ya son opuestos: no hace falta multiplicar.' },
       ], { prompt: `¿Qué haces para eliminar ${w}?`, fx: { type: 'factors', w }, hints: [`Para eliminar ${w}, sus coeficientes deben ser opuestos.`, `Mira $${texNum(p)}${w}$ y $${texNum(r)}${w}$.`, '¿Tienen el mismo número y signo contrario?', 'Si ya son opuestos, se suman directamente.'] }));
     }
     if (!already) {

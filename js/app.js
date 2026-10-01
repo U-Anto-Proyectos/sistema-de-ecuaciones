@@ -327,7 +327,7 @@ function onCorrect(step) {
   later(() => { if (['merge', 'cancel', 'substitute'].includes(t)) dropStage(); nextStep(); }, 650);
 }
 
-function writeLine(line, cls = '') { addLine(`<div class="ln new write ${cls}">${K(line.tex)}</div>`); }
+function writeLine(line, cls = '') { addLine(`<div class="ln new write ${cls}">${K(line.write || line.tex)}</div>`); }
 function writeTag(text) { addLine(`<div class="ln tag">${rich(text)}</div>`, false); }
 function writeNote(text) { addLine(`<div class="ln new write note">${rich(text)}</div>`); }
 function addLine(html, arrow = true) {
