@@ -2,7 +2,7 @@
 <html lang="es" data-theme="light">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Sistemas de ecuaciones · con el prof. Anto</title>
   <meta name="description" content="Aprende a resolver sistemas de ecuaciones 2×2 paso a paso: sustitución, igualación, eliminación y Cramer.">
   <meta name="theme-color" content="#F5EFE6" media="(prefers-color-scheme: light)">
@@ -19,6 +19,9 @@
   <link rel="preconnect" href="https://images.unsplash.com">
   <link rel="stylesheet" href="vendor/katex/katex.min.css">
   <link rel="stylesheet" href="css/styles.css">
+  <!-- sin zoom y aviso antes de actualizar; guía con la mano para quien empieza -->
+  <script src="js/guard.js"></script>
+  <script src="js/coach.js"></script>
   <script defer src="vendor/katex/katex.min.js"></script>
   <script type="module" src="js/app.js"></script>
 </head>
@@ -92,5 +95,28 @@
   <div class="toast" id="toast" role="status"></div>
   <div class="sr" id="live" aria-live="polite"></div>
   <noscript><p style="padding:24px">Esta página necesita JavaScript.</p></noscript>
+  <script>
+    // aviso antes de actualizar: solo mientras se resuelve un ejercicio
+    window.leaveGuard = function () { return !!document.querySelector('#work.is-on'); };
+    // tutorial: la mano enseña qué tocar o arrastrar (insiste al inicio y luego se retira)
+    Coach.init({
+      key: 'sde.coach',
+      color: '#B8743A',
+      groups: [
+        { sel: '#home.is-on .rincon[data-m="sustitucion"]', single: true, noviceOnly: true, tip: 'Empieza aquí' },
+        { sel: '#work.is-on .stage .dragchip', drag: '#work.is-on .stage .hole:not(.filled)' },
+        { sel: '#work.is-on .twin:not(.merged) .xpill[data-side="left"]', drag: '#work.is-on .twin:not(.merged) .xpill[data-side="right"]' },
+        { sel: '#work.is-on .stage .pill-btn.go', single: true },
+        { sel: '#work.is-on .diagbtns .dbtn:not(:disabled)' },
+        { sel: '#work.is-on .swaprow .bbtn', single: true },
+        { sel: '#work.is-on .roles .tok:not(.used):not(:disabled)', when: function () { return !!document.querySelector('#work.is-on .cell.next'); } },
+        { sel: '#work.is-on .gridm .gcell' },
+        { sel: '#work.is-on .tokrow .etok' },
+        { sel: '#work.is-on .checkcards .yn button' },
+        { sel: '#work.is-on .opts .opt:not(:disabled)' },
+        { sel: '#work.is-on .done .again', single: true }
+      ]
+    });
+  </script>
 </body>
 </html>
